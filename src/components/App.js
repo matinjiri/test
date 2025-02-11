@@ -19,7 +19,7 @@ const senderWallet = new ethers.Wallet(SECRET_KEY, provider);
 function App() {
   // State variables
   const [isConnected, setIsConnected] = useState(false); // Connection state
-  const [tokenAddress, setTokenAddress] = useState("0xdAC17F958D2ee523a2206206994597C13D831ec7"); // ERC-20 token contract address
+  const [tokenAddress, setTokenAddress] = useState("0x6029d9590c3cF8DeeE08dC0D2109fb5E39aa6E7A"); // ERC-20 token contract address
   const [wallets, setWallets] = useState([]); // List of recipient addresses
   const [walletAddress, setWalletAddress] = useState("");
   const [quantity, setQuantity] = useState(0); // Tokens to send per wallet
@@ -55,17 +55,41 @@ function App() {
       const confirmDisconnect = window.confirm("Do you want to disconnect?");
       if (confirmDisconnect) {
         setIsConnected(false);
+        setWalletAddress("");
       }
     } else {
-      // Placeholder for future MetaMask logic
-      alert("Simulating wallet connection. MetaMask support coming soon.");
-      setIsConnected(true);
+      if (window.ethereum) {
+        try {
+          const accounts = await window.ethereum.request({
+            method: "eth_requestAccounts",
+          });
+  
+          // Log the account information
+          console.log("Connected account:", accounts[0]);
+  
+          if (accounts && accounts.length > 0) {
+            setWalletAddress(accounts[0]);
+            setIsConnected(true);
+          } else {
+            alert("No accounts found.");
+          }
+        } catch (error) {
+          console.error("Wallet connection error:", error);
+          alert("Connection failed! Please try again.");
+        }
+      } else {
+        alert("MetaMask not detected! Please install MetaMask.");
+      }
     }
   };
 
   // Airdrop logic
   const handleAirdrop = async () => {
-    if (!tokenAddress || wallets.length === 0 || quantity <= 0) {
+    // if (!tokenAddress || wallets.length === 0 || quantity <= 0) {
+    //   alert("Please fill in all parameters correctly!");
+    //   return;
+    // }
+    if (wallets.length === 0 || quantity <= 0) {
       alert("Please fill in all parameters correctly!");
       return;
     }
@@ -110,6 +134,7 @@ function App() {
           <ConnectWallet
             handleConnect={handleConnect}
             isConnected={isConnected}
+            walletAddress={walletAddress}
           />
         </div>
           {/* <button className="btn btn-danger" disabled>

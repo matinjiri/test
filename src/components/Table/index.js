@@ -1,11 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react-hooks/rules-of-hooks */
 import Table from "react-bootstrap/Table";
-import Pagination from "react-bootstrap/Pagination";
 import Button from "react-bootstrap/Button";
-import InputGroup from "react-bootstrap/InputGroup";
-import Form from "react-bootstrap/Form";
 import { useEffect, useState } from "react";
+import Papa from "papaparse"; 
+import { ethers } from "ethers"; 
 import "./style.css";
 
 const SenderTable = (props) => {
@@ -15,6 +14,7 @@ const SenderTable = (props) => {
   const { wallets, setWallets, isConnected } = props;
   const { currentPage, setCurrentPage } = useState(1);
   const [itemPerPage] = useState(5);
+  const [errorMessages, setErrorMessages] = useState([]);
 
   useEffect(() => {
     indexOfLastItem = currentPage * itemPerPage;
@@ -25,17 +25,71 @@ const SenderTable = (props) => {
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
   };
-  const uploadWallet = async (e) => {
-    // setWallets(dummy);
-    const response = await fetch(process.env.PUBLIC_URL + "/wallets.csv");
-    const data = await response.text();
-    const dataArray = data.replace(/\s/g, "").split(",");
-    const resultArr = dataArray.filter((item) => item !== "");
-    setWallets(resultArr);
+
+  // Function to validate Ethereum address format
+  const isValidEthereumAddress = (address) => {
+    return ethers.isAddress(address);
+  };
+
+  // Function to handle the CSV file upload and parse the content
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0]; // Get the uploaded file
+
+    if (!file) {
+      alert("Please select a file.");
+      return;
+    }
+
+    // Read the content of the file using FileReader
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      // Use PapaParse to parse the CSV content
+      const result = Papa.parse(reader.result, { header: false, skipEmptyLines: true });
+      const walletAddresses = result.data.map((row) => row[0].trim()); // Assuming each row contains one address
+
+      // Validate and filter addresses
+      const validAddresses = [];
+      const errors = [];
+
+      walletAddresses.forEach((address) => {
+        if (!isValidEthereumAddress(address)) {
+          errors.push(`${address} is not a valid Ethereum address.`);
+        } else if (validAddresses.includes(address)) {
+          errors.push(`${address} is a duplicate address.`);
+        } else {
+          validAddresses.push(address);
+        }
+      });
+
+      if (errors.length > 0) {
+        setErrorMessages(errors); // Set error messages to display
+        alert("Some addresses were invalid or duplicated. Please check the console for details.");
+      } else {
+        setWallets(validAddresses); // Set the wallets state with valid addresses
+        alert("Addresses uploaded successfully.");
+      }
+    };
+
+    reader.onerror = (error) => {
+      console.error("Error reading file:", error);
+      alert("Failed to read file.");
+    };
+
+    reader.readAsText(file); // Read the file as text
   };
 
   return (
     <div>
+      {/* Display error messages */}
+      {errorMessages.length > 0 && (
+        <div className="errorMessages">
+          {errorMessages.map((error, idx) => (
+            <p key={idx} className="errorMessage">{error}</p>
+          ))}
+        </div>
+      )}
+
       <Table responsive>
         <thead>
           <tr>
@@ -47,7 +101,7 @@ const SenderTable = (props) => {
           {wallets && wallets.length > 0
             ? wallets.map((e, idx) => {
                 return (
-                  <tr>
+                  <tr key={idx}>
                     <td>{idx + 1}</td>
                     <td>{e}</td>
                   </tr>
@@ -57,42 +111,23 @@ const SenderTable = (props) => {
         </tbody>
       </Table>
 
-      {/* <Pagination>
-        {[
-          ...Array(Math.ceil(wallets && wallets.length / itemPerPage)).key(),
-        ].map(
-          // eslint-disable-next-line array-callback-return
-          (number) => {
-            <Pagination.Item
-              key={number + 1}
-              active={number + 1 === currentPage}
-              onClick={() => handlePageChange(number + 1)}
-            >
-              {number + 1}
-            </Pagination.Item>;
-          }
-        )}
-      </Pagination> */}
-
       <div className="tableButton">
         <Button
           className="uploadButton"
           disabled={!isConnected}
-          onClick={uploadWallet}
+          onClick={() => document.getElementById("fileInput").click()} 
         >
           Upload file
         </Button>
-        {/* <InputGroup className="addButton">
-          <Form.Control
-            placeholder="New Wallet Address"
-            aria-label="Recipient's username"
-            aria-describedby="basic-addon2"
-            aria-disabled={!isConnected}
-          />
-          <Button variant="primary" id="button-addon2" disabled={!isConnected}>
-            Add
-          </Button>
-        </InputGroup> */}
+
+        {/* Hidden file input */}
+        <input
+          id="fileInput"
+          type="file"
+          accept=".csv"
+          style={{ display: "none" }}
+          onChange={handleFileUpload} 
+        />
       </div>
     </div>
   );
